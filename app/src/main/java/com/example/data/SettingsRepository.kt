@@ -45,10 +45,6 @@ class SettingsRepository(context: Context) {
         get() = prefs.getString("system_prompt", DEFAULT_SYSTEM_PROMPT) ?: DEFAULT_SYSTEM_PROMPT
         set(value) = prefs.edit().putString("system_prompt", value).apply()
 
-    var musicServerUrl: String
-        get() = prefs.getString("music_server_url", "") ?: ""
-        set(value) = prefs.edit().putString("music_server_url", value.trim()).apply()
-
     var ttsProvider: String
         get() = prefs.getString("tts_provider", "edge") ?: "edge"
         set(value) = prefs.edit().putString("tts_provider", value).apply()
@@ -90,31 +86,8 @@ QUY TẮC ĐỊNH DẠNG (BẮT BUỘC):
 - Nếu cần liệt kê, dùng dấu gạch ngang hoặc số.
 - Viết văn bản thuần, tự nhiên như đang nói chuyện.
 
-QUY TẮC GỌI CÔNG CỤ PHÁT NHẠC (CỰC KỲ QUAN TRỌNG):
-- Khi người dùng yêu cầu phát nhạc, nghe nhạc, mở bài hát, bật nhạc,
-  chuyển bài, đổi bài, hoặc liên khúc → BẮT BUỘC gọi công cụ play_music.
-- CÁCH GỌI: sử dụng cơ chế tool_calls của API (function calling).
-- TUYỆT ĐỐI KHÔNG viết JSON ra text.
-- Sau khi tool trả về kết quả, hãy trả lời tự nhiên với tên bài hát cụ thể.
-
-KHI TOOL TRẢ VỀ "THÀNH CÔNG" — BẮT BUỘC:
-- Trả lời 1-2 câu NGẮN, TỰ NHIÊN, có NÓI TÊN BÀI HÁT.
-- Dùng câu đa dạng, ví dụ:
-  * "Đang phát bài [tên] cho bạn đây, nghe nhạc vui vẻ nhé!"
-  * "Bài [tên] đang phát trên loa rồi đó, hy vọng bạn thích!"
-  * "Mình vừa bật bài [tên] cho bạn, chúc nghe vui!"
-  * "[tên] đang phát đây, thư giãn nhé bạn!"
-  * "Đang lên loa bài [tên], bạn nghe thử xem sao!"
-- KHÔNG nhắc đến việc gọi công cụ / tool / function.
-- KHÔNG nói các câu sáo rỗng kiểu "Đã phát bài hát cho bạn".
-
-QUY TẮC TRẢ LỜI SAU KHI PHÁT NHẠC:
-- PHẢI nói CỤ THỂ TÊN BÀI HÁT trong câu trả lời.
-- Dùng câu tự nhiên, đa dạng, nhân tính hóa. Ví dụ:
-  * "Đang phát cho bạn bài [tên bài] đây, nghe thử nhé!"
-  * "Bài [tên bài] đang được phát trên loa của bạn rồi đó."
-  * "Mình vừa bật bài [tên bài] cho bạn, chúc bạn nghe vui!"
-- TUYỆT ĐỐI KHÔNG dùng câu đơn điệu như "Đã phát bài hát cho bạn".
+Nếu người dùng muốn nghe nhạc, hướng dẫn họ mở tab Nhạc để chọn tệp trên thiết bị.
+Không tìm kiếm, tải xuống hoặc phát nhạc trực tuyến.
 
 QUY TẮC CẢM XÚC (BẮT BUỘC):
 - Đầu mỗi câu trả lời, chèn tag cảm xúc dạng [emotion:xxx]

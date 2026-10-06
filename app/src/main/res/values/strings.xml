@@ -1,3 +1,24 @@
 <resources>
     <string name="app_name">Việt AI</string>
+    <string name="local_music_title">Nhạc của tôi</string>
+    <string name="local_music_subtitle">Phát nhạc có sẵn trên thiết bị</string>
+    <string name="scan_music">Quét nhạc</string>
+    <string name="choose_audio">Chọn tệp</string>
+    <string name="device_library">Thư viện (%1$d)</string>
+    <string name="saved_playlist">Danh sách (%1$d)</string>
+    <string name="track_count">%1$d bài hát</string>
+    <string name="unknown_track">Bài hát không tên</string>
+    <string name="local_audio_file">Tệp âm thanh</string>
+    <string name="add_to_playlist">Thêm vào danh sách</string>
+    <string name="previous_track">Bài trước</string>
+    <string name="next_track">Bài tiếp</string>
+    <string name="play">Phát</string>
+    <string name="pause">Tạm dừng</string>
+    <string name="shuffle">Phát ngẫu nhiên</string>
+    <string name="repeat_mode">Chế độ lặp</string>
+    <string name="empty_playlist">Danh sách đang trống</string>
+    <string name="empty_library">Chưa tìm thấy nhạc</string>
+    <string name="add_audio_hint">Chọn tệp âm thanh để thêm vào danh sách phát.</string>
+    <string name="scan_audio_hint">Quét thư viện thiết bị hoặc chọn tệp âm thanh của bạn.</string>
+    <string name="now_playing_artwork">Ảnh bìa bài hát đang phát</string>
 </resources>

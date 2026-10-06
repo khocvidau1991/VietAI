@@ -6,12 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.api.ApiClient
 import com.example.api.Content
 import com.example.api.GeminiRequest
-import com.example.api.OpenAiFunctionCall
-import com.example.api.OpenAiFunctionDef
 import com.example.api.OpenAiMessage
 import com.example.api.OpenAiRequest
-import com.example.api.OpenAiTool
-import com.example.api.OpenAiToolCall
 import com.example.api.Part
 import com.example.api.SystemInstruction
 import com.example.api.VisionApiHelper
@@ -22,24 +18,19 @@ import com.example.data.PersonaRepository
 import com.example.data.SettingsRepository
 import com.example.data.SupportedModels
 import com.example.service.EmotionService
-import com.example.service.MusicPlayer
-import com.example.service.MusicServerClient
+import com.example.service.LocalMusicPlayback
 import com.example.util.LogRepository
 import com.example.util.PersonaSwitcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "ChatViewModel"
-        private const val MAX_TOOL_ROUNDS = 3
         private const val MAX_HISTORY_MSGS = 20
 
         private val MUSIC_VERBS = listOf(
@@ -152,41 +143,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         return p.allowMusic
     }
 
-    private fun tryParseToolCallFromText(text: String?): OpenAiToolCall? {
-        text ?: return null
-        val trimmed = text.trim()
-        if (!trimmed.contains("{") || !trimmed.contains("}")) return null
-        val startIdx = trimmed.indexOf('{')
-        val endIdx = trimmed.lastIndexOf('}')
-        if (endIdx <= startIdx) return null
-        val jsonStr = trimmed.substring(startIdx, endIdx + 1)
-        return try {
-            val json = JSONObject(jsonStr)
-            val toolName = json.optString("tool",
-                json.optString("name",
-                    json.optString("function", "")))
-            if (toolName != "play_music") return null
-            val argsObj = json.optJSONObject("tool_input")
-                ?: json.optJSONObject("arguments")
-                ?: json.optJSONObject("parameters")
-                ?: json.optJSONObject("args")
-                ?: return null
-            val query = argsObj.optString("query", "").trim()
-            if (query.isBlank()) return null
-            OpenAiToolCall(
-                id = "fallback_" + System.currentTimeMillis(),
-                type = "function",
-                function = OpenAiFunctionCall(
-                    name = "play_music",
-                    arguments = """{"query":"${query.replace("\"", "\\\"")}"}"""
-                )
-            )
-        } catch (e: Exception) {
-            LogRepository.log(TAG, "[WARN] parse tool from text: ${e.message}")
-            null
-        }
-    }
-
     fun sendMessage(text: String) {
         if (text.isBlank()) return
         viewModelScope.launch {
@@ -200,6 +156,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             val priorHistory = messages.value.toList()
             dao.insertMessage(ChatMessage(text = text, isUser = true))
+            if (isMusicRequest(text)) {
+                val response = if (currentPersonaAllowsMusic()) {
+                    "Mở tab Nhạc để quét thư viện trên thiết bị hoặc chọn tệp âm thanh bạn muốn phát."
+                } else {
+                    "Nhân vật hiện tại không hỗ trợ phát nhạc. Bạn có thể chọn nhân vật khác trong ứng dụng."
+                }
+                dao.insertMessage(
+                    ChatMessage(
+                        text = "[emotion:neutral] $response",
+                        isUser = false
+                    )
+                )
+                return@launch
+            }
             _isLoading.value = true
             try {
                 when (settings.activeProvider) {
@@ -339,30 +309,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         dao.insertMessage(ChatMessage(text = msg, isUser = false))
     }
 
-    fun onTrackCompleted(trackTitle: String) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val prompt = "Người dùng vừa nghe xong bài hát \"$trackTitle\". " +
-                    "Phản hồi 1-2 câu ngắn gọn, tự nhiên, ấm áp. " +
-                    "Bắt đầu bằng [emotion:xxx]."
-                val raw = when (settings.activeProvider) {
-                    "Gemini" -> callGeminiDirect(prompt)
-                    "Groq" -> callOpenAiDirect(prompt, SettingsRepository.GROQ_BASE_URL,
-                        settings.groqApiKey, settings.groqModel)
-                    "OpenAI" -> callOpenAiDirect(prompt, settings.customBaseUrl,
-                        settings.openAiApiKey, settings.openAiModel)
-                    else -> null
-                }
-                if (raw != null) {
-                    val (e, t) = extractEmotion(raw)
-                    EmotionService.set(e)
-                    dao.insertMessage(ChatMessage(text = t, isUser = false))
-                }
-            } catch (_: Exception) {} finally { _isLoading.value = false }
-        }
-    }
-
     private suspend fun callGemini(text: String, priorHistory: List<ChatMessage>) {
         val apiKey = settings.geminiApiKey
         if (apiKey.isBlank()) { _error.value = "Chưa nhập Gemini API Key."; return }
@@ -401,98 +347,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val authHeader: String? =
             if (apiKey.isBlank() && !url.contains("groq.com")) null else "Bearer $apiKey"
 
-        val personaAllows = currentPersonaAllowsMusic()
-        val isMusic = personaAllows && isMusicRequest(userText)
-        val tools = if (isMusic) listOf(buildPlayMusicTool()) else null
-
-        LogRepository.log(TAG, "isMusic=$isMusic | model=$mdl")
-
         val conv = mutableListOf<OpenAiMessage>()
         conv.add(OpenAiMessage("system", settings.systemPrompt))
         conv.addAll(buildHistory(priorHistory))
         conv.add(OpenAiMessage("user", userText))
-
-        var round = 0
-        var finalText: String? = null
-        var toolExecuted = false
-
-        while (round < MAX_TOOL_ROUNDS) {
-            round++
-
-            // ★ CHỈ ép tool ở round đầu tiên. Round 2+ để AI trả lời tự nhiên.
-            val currentToolChoice = if (isMusic && !toolExecuted) "required" else null
-            val currentTools = if (isMusic && !toolExecuted) tools else null
-
-            val request = OpenAiRequest(
-                model = mdl, messages = conv,
-                tools = currentTools, toolChoice = currentToolChoice
-            )
-            val response = ApiClient.openAiApi.chatCompletions(url, authHeader, request)
-            val choice = response.choices?.firstOrNull()
-            val assistantMsg = choice?.message ?: run {
-                _error.value = "Không nhận được phản hồi"
-                return
-            }
-
-            val apiToolCalls = assistantMsg.toolCalls
-            val fallbackToolCall = if (apiToolCalls.isNullOrEmpty() && isMusic && !toolExecuted)
-                tryParseToolCallFromText(assistantMsg.content) else null
-
-            LogRepository.log(TAG, "round=$round finish=${choice.finishReason} " +
-                "toolCalls=${apiToolCalls?.size ?: 0} fallback=${fallbackToolCall != null} " +
-                "toolExecuted=$toolExecuted")
-
-            // Không có tool call → trả lời tự nhiên
-            if (apiToolCalls.isNullOrEmpty() && fallbackToolCall == null) {
-                finalText = assistantMsg.content ?: "(Không có nội dung)"
-                break
-            }
-
-            // Fallback JSON text
-            if (fallbackToolCall != null) {
-                LogRepository.log(TAG, "[FALLBACK] parse JSON text")
-                conv.add(OpenAiMessage(
-                    role = "assistant", content = null,
-                    toolCalls = listOf(fallbackToolCall)
-                ))
-                val result = executeToolCall(fallbackToolCall)
-                conv.add(OpenAiMessage(
-                    role = "tool", content = result,
-                    toolCallId = fallbackToolCall.id
-                ))
-                toolExecuted = true
-                continue
-            }
-
-            // Tool call chuẩn
-            val safeToolCalls = apiToolCalls ?: emptyList()
-            conv.add(OpenAiMessage("assistant", assistantMsg.content, safeToolCalls))
-            for (call in safeToolCalls) {
-                LogRepository.log(TAG, "[TOOL-API] ${call.function.name}")
-                val result = executeToolCall(call)
-                conv.add(OpenAiMessage("tool", result, toolCallId = call.id))
-            }
-            toolExecuted = true
-        }
-
-        if (finalText == null) finalText = "Đã xử lý."
+        val request = OpenAiRequest(model = mdl, messages = conv)
+        val response = ApiClient.openAiApi.chatCompletions(url, authHeader, request)
+        val finalText = response.choices?.firstOrNull()?.message?.content
+            ?: "(Không có nội dung)"
         val (e, t) = extractEmotion(finalText)
         EmotionService.set(e)
         dao.insertMessage(ChatMessage(text = t, isUser = false))
-    }
-
-    private suspend fun callGeminiDirect(prompt: String): String? {
-        val apiKey = settings.geminiApiKey
-        if (apiKey.isBlank()) return null
-        return try {
-            val request = GeminiRequest(
-                contents = listOf(Content("user", listOf(Part(text = prompt)))),
-                systemInstruction = SystemInstruction(
-                    parts = listOf(Part(text = settings.systemPrompt)))
-            )
-            val response = ApiClient.geminiApi.generateContent(apiKey, request)
-            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
-        } catch (_: Exception) { null }
     }
 
     private suspend fun callOpenAiDirect(
@@ -513,68 +378,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         } catch (_: Exception) { null }
     }
 
-    private fun buildPlayMusicTool(): OpenAiTool = OpenAiTool(
-        type = "function",
-        function = OpenAiFunctionDef(
-            name = "play_music",
-            description = "Tìm và phát bài hát/liên khúc từ YouTube. " +
-                "Gọi BẤT CỨ khi user yêu cầu phát/mở/bật/nghe/chơi nhạc " +
-                "hoặc chuyển/đổi bài. Không trả lời vòng vo.",
-            parameters = mapOf(
-                "type" to "object",
-                "properties" to mapOf(
-                    "query" to mapOf(
-                        "type" to "string",
-                        "description" to "Tên bài hát, ca sĩ, hoặc từ khoá tìm kiếm"
-                    )
-                ),
-                "required" to listOf("query")
-            )
-        )
-    )
-
-    private suspend fun executeToolCall(call: OpenAiToolCall): String {
-        return try {
-            when (call.function.name) {
-                "play_music" -> handlePlayMusic(call.function)
-                else -> "Tool không xác định: ${call.function.name}"
-            }
-        } catch (e: Exception) { "Lỗi tool: ${e.message}" }
-    }
-
-    private suspend fun handlePlayMusic(fn: OpenAiFunctionCall): String {
-        val query: String = try {
-            JSONObject(fn.arguments).optString("query", "").trim()
-        } catch (_: Exception) { "" }
-        if (query.isBlank()) return "Lỗi: thiếu tham số 'query'"
-
-        val serverUrl = settings.musicServerUrl
-        if (serverUrl.isBlank()) return "Chưa cấu hình Music Server."
-
-        return withContext(Dispatchers.IO) {
-            val results = MusicServerClient.search(serverUrl, query, limit = 5)
-            if (results.isEmpty()) return@withContext "Không tìm thấy bài hát: $query."
-            val first = results.first()
-            val stream = MusicServerClient.getStreamUrl(serverUrl, first.webpageUrl, "audio")
-            if (stream == null || stream.url.isNullOrBlank()) {
-                return@withContext "Không lấy được stream URL cho: ${first.title}"
-            }
-            val streamUrl: String = stream.url
-            val title: String = stream.title ?: first.title
-            withContext(Dispatchers.Main) {
-                MusicPlayer.playUrl(getApplication(), streamUrl, title, stream.thumbnail)
-            }
-            // ★ Tool result nhắc AI PHẢI trả lời tự nhiên có tên bài
-            "THÀNH CÔNG: Đã bắt đầu phát bài \"$title\" trên loa. " +
-                "BÂY GIỜ hãy trả lời người dùng bằng 1-2 câu NGẮN, TỰ NHIÊN, " +
-                "CÓ NÓI TÊN BÀI HÁT, ví dụ: " +
-                "\"Đang phát bài $title cho bạn đây, nghe nhạc vui vẻ nhé!\", " +
-                "hoặc \"Bài $title đang phát trên loa rồi đó, hy vọng bạn thích!\". " +
-                "KHÔNG nhắc đến việc gọi công cụ. KHÔNG nói \"Đã phát bài hát cho bạn\"."
-        }
-    }
-
-    fun stopMusic() = MusicPlayer.stop()
+    fun stopMusic() = LocalMusicPlayback.stop()
     fun clearHistory() { viewModelScope.launch { dao.clearHistory() } }
     fun dismissError() { _error.value = null }
 }

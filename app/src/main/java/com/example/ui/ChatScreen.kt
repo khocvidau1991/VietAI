@@ -61,7 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import com.example.data.ChatMessage
 import com.example.service.EmotionService
-import com.example.service.MusicPlayer
+import com.example.service.LocalMusicPlayback
 import com.example.speech.SpeechRecognitionState
 import com.example.speech.SpeechToTextService
 import com.example.speech.TextToSpeechService
@@ -99,10 +99,10 @@ fun ChatScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
 
-    val isPlayingMusic by MusicPlayer.isPlaying.collectAsState()
-    val isBufferingMusic by MusicPlayer.isBuffering.collectAsState()
-    val currentTrack by MusicPlayer.currentTrack.collectAsState()
-    val currentThumbnail by MusicPlayer.currentThumbnail.collectAsState()
+    val isPlayingMusic by LocalMusicPlayback.isPlaying.collectAsState()
+    val isBufferingMusic by LocalMusicPlayback.isBuffering.collectAsState()
+    val currentTrack by LocalMusicPlayback.currentTrack.collectAsState()
+    val currentThumbnail by LocalMusicPlayback.currentArtwork.collectAsState()
     val currentEmotion by EmotionService.emotion.collectAsState()
 
     var inputText by remember { mutableStateOf("") }
@@ -235,7 +235,7 @@ fun ChatScreen(
         }
         speechToTextService.onFinalResultListener = { finalResult ->
             if (liveMode.value) {
-                if (finalResult.isNotBlank() && !MusicPlayer.isPlaying.value) {
+                if (finalResult.isNotBlank() && !LocalMusicPlayback.isPlaying.value) {
                     viewModel.sendMessage(finalResult)
                 }
             } else {
@@ -247,7 +247,7 @@ fun ChatScreen(
                 if (errorCode == SpeechRecognizer.ERROR_NO_MATCH ||
                     errorCode == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                     Handler(Looper.getMainLooper()).postDelayed({
-                        if (liveMode.value && !isSpeaking && !MusicPlayer.isPlaying.value)
+                        if (liveMode.value && !isSpeaking && !LocalMusicPlayback.isPlaying.value)
                             startListeningNow()
                     }, 800)
                 }
@@ -265,9 +265,9 @@ fun ChatScreen(
         }
         textToSpeechService.onSpeechDone = {
             waitingForTts.value = false
-            if (liveMode.value && !MusicPlayer.isPlaying.value) {
+            if (liveMode.value && !LocalMusicPlayback.isPlaying.value) {
                 Handler(Looper.getMainLooper()).postDelayed({
-                    if (liveMode.value && !MusicPlayer.isPlaying.value) startListeningNow()
+                    if (liveMode.value && !LocalMusicPlayback.isPlaying.value) startListeningNow()
                 }, 500)
             }
         }
@@ -278,20 +278,10 @@ fun ChatScreen(
         if (liveMode.value) {
             textToSpeechService.stop()
             kotlinx.coroutines.delay(300)
-            if (!MusicPlayer.isPlaying.value) startListeningNow()
+            if (!LocalMusicPlayback.isPlaying.value) startListeningNow()
         } else {
             speechToTextService.cancel()
             textToSpeechService.stop()
-        }
-    }
-
-    val completedTrack by MusicPlayer.completedTrack.collectAsState()
-    LaunchedEffect(completedTrack) {
-        val track = completedTrack
-        if (track != null) {
-            kotlinx.coroutines.delay(1200)
-            viewModel.onTrackCompleted(track)
-            MusicPlayer.clearCompletedTrack()
         }
     }
 
@@ -344,9 +334,9 @@ fun ChatScreen(
                 rangeMode = false
             }
         } else {
-            if (liveMode.value && !MusicPlayer.isPlaying.value) {
+            if (liveMode.value && !LocalMusicPlayback.isPlaying.value) {
                 Handler(Looper.getMainLooper()).postDelayed({
-                    if (liveMode.value && !MusicPlayer.isPlaying.value) startListeningNow()
+                    if (liveMode.value && !LocalMusicPlayback.isPlaying.value) startListeningNow()
                 }, 800)
             }
         }
@@ -472,7 +462,7 @@ fun ChatScreen(
                 ) {
                     ChipItem(if (liveMode.value) "LIVE" else "STT: VI-VN", liveMode.value)
                     ChipItem("BẢO MẬT CỤC BỘ", false)
-                    ChipItem("MCP MUSIC", false)
+                    ChipItem("NHẠC CỤC BỘ", false)
                 }
                 if (currentTrack != null) {
                     Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {

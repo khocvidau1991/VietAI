@@ -49,6 +49,7 @@
 
 # ============== Media3 ==============
 -dontwarn androidx.media3.**
+-keep class com.example.service.LocalMusicService { *; }
 
 # ============== Strip log calls in release ==============
 -assumenosideeffects class android.util.Log {

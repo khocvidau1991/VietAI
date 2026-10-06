@@ -17,7 +17,6 @@ release/
 app/release/
 *.jks
 *.keystore
-!debug.keystore
 
 # ===== Android Studio / IntelliJ =====
 .idea/
@@ -47,6 +46,14 @@ obj/
 # ===== Keystore nhạy cảm =====
 keystore.properties
 signing.properties
+*.p12
+*.pem
+*.key
+
+# ===== Local environment and secrets =====
+.env
+!.env.example
+secrets.properties
 
 # ===== Files tạm =====
 *.tmp
