@@ -12,7 +12,7 @@ coreKtx = "1.8.0"
 lifecycleRuntimeKtx = "2.6.2"
 material3 = "1.0.1"
 navigationCompose = "2.5.3"
-room = "2.5.0"
+room = "2.8.5"
 
 coilCompose = "2.2.2"
 retrofit = "2.9.0"
