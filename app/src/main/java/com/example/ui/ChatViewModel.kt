@@ -13,6 +13,7 @@ import com.example.api.SystemInstruction
 import com.example.api.VisionApiHelper
 import com.example.data.ChatDatabase
 import com.example.data.ChatMessage
+import com.example.data.LocalMusicIntent
 import com.example.data.Persona
 import com.example.data.PersonaRepository
 import com.example.data.SettingsRepository
@@ -33,26 +34,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         private const val TAG = "ChatViewModel"
         private const val MAX_HISTORY_MSGS = 20
 
-        private val MUSIC_VERBS = listOf(
-            "phát", "mở", "bật", "nghe", "chơi", "play",
-            "cho tôi nghe", "cho mình nghe",
-            "phát cho tôi", "mở cho tôi", "bật cho tôi",
-            "chuyển", "đổi", "sang", "next", "skip"
-        )
-
-        private val MUSIC_NOUNS = listOf(
-            "bài", "nhạc", "liên khúc", "playlist", "album",
-            "song", "music", "track", "bản", "ca khúc",
-            "nhạc vàng", "nhạc trẻ", "nhạc hot", "nhạc thiếu nhi",
-            "bolero", "remix", "lofi", "karaoke"
-        )
-
-        private val SPECIAL_MUSIC_PHRASES = listOf(
-            "chuyển bài", "đổi bài", "bài khác", "bài tiếp",
-            "sang bài", "next bài", "skip bài",
-            "play music", "play song",
-            "mở nhạc", "bật nhạc", "nghe nhạc", "phát nhạc", "chơi nhạc"
-        )
     }
 
     private val db = ChatDatabase.getDatabase(application)
@@ -85,22 +66,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             else -> ""
         }
         return SupportedModels.supportsVision(provider, model)
-    }
-
-    private fun isMusicRequest(text: String): Boolean {
-        val lower = text.lowercase().trim()
-        if (lower.isBlank()) return false
-        if (SPECIAL_MUSIC_PHRASES.any { lower.contains(it) }) return true
-        val hasVerb = MUSIC_VERBS.any { verb ->
-            try { Regex("\\b${Regex.escape(verb)}\\b").containsMatchIn(lower) }
-            catch (_: Exception) { lower.contains(verb) }
-        }
-        if (!hasVerb) return false
-        val hasNoun = MUSIC_NOUNS.any { noun ->
-            try { Regex("\\b${Regex.escape(noun)}\\b").containsMatchIn(lower) }
-            catch (_: Exception) { lower.contains(noun) }
-        }
-        return hasNoun
     }
 
     private fun extractEmotion(text: String): Pair<String, String> {
@@ -156,15 +121,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             val priorHistory = messages.value.toList()
             dao.insertMessage(ChatMessage(text = text, isUser = true))
-            if (isMusicRequest(text)) {
+            if (LocalMusicIntent.isMusicRequest(text)) {
                 val response = if (currentPersonaAllowsMusic()) {
                     "Mở tab Nhạc để quét thư viện trên thiết bị hoặc chọn tệp âm thanh bạn muốn phát."
                 } else {
                     "Nhân vật hiện tại không hỗ trợ phát nhạc. Bạn có thể chọn nhân vật khác trong ứng dụng."
                 }
+                val (emotion, cleanResponse) = extractEmotion("[emotion:neutral] $response")
+                EmotionService.set(emotion)
                 dao.insertMessage(
                     ChatMessage(
-                        text = "[emotion:neutral] $response",
+                        text = cleanResponse,
                         isUser = false
                     )
                 )
