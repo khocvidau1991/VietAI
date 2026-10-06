@@ -1,7 +1,7 @@
 [versions]
 mediapipeGenai = "0.10.14"
 okhttpSse = "4.10.0"
-androidApplication = "7.4.2"
+androidApplication = "9.4.1"
 kotlinAndroid = "1.7.20"
 ksp = "1.7.20-1.0.6"
 composeCompiler = "1.3.2"
