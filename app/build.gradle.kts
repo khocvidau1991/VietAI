@@ -47,39 +47,17 @@ android {
     }
   }
 
-  signingConfigs {
-    create("release") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
-      isV1SigningEnabled = true
-      isV2SigningEnabled = true
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
-      isV1SigningEnabled = true
-      isV2SigningEnabled = true
-    }
-  }
-
   buildTypes {
     release {
       isCrunchPngs = false
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      // Debug: KHÔNG minify, KHÔNG shrink — dễ debug, tăng tốc build
       isMinifyEnabled = false
       isShrinkResources = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("debugConfig")
     }
   }
 
@@ -119,6 +97,7 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
+  implementation(libs.androidx.datastore.preferences)
   implementation("androidx.multidex:multidex:2.0.1")
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -142,10 +121,8 @@ dependencies {
   implementation(libs.okhttp.sse)
 
   implementation(libs.media3.exoplayer)
-  implementation(libs.media3.exoplayer.hls)
   implementation(libs.media3.common)
-  implementation(libs.media3.datasource.okhttp)
-  implementation(libs.media3.ui)
+  implementation(libs.media3.session)
 
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)

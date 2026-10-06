@@ -38,7 +38,6 @@ fun SettingsScreen(
     var baseUrl by remember { mutableStateOf(viewModel.settings.customBaseUrl) }
     var systemPrompt by remember { mutableStateOf(viewModel.settings.systemPrompt) }
     var provider by remember { mutableStateOf(viewModel.settings.activeProvider) }
-    var musicServerUrl by remember { mutableStateOf(viewModel.settings.musicServerUrl) }
 
     // Dropdown state cho model
     var groqModelExpanded by remember { mutableStateOf(false) }
@@ -376,18 +375,6 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Divider()
-
-            Text("Music Server (MCP)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold)
-            OutlinedTextField(
-                value = musicServerUrl,
-                onValueChange = { musicServerUrl = it; viewModel.settings.musicServerUrl = it },
-                label = { Text("Music Server URL") },
-                placeholder = { Text("http://192.168.1.10:5001") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
 
             Divider()
 

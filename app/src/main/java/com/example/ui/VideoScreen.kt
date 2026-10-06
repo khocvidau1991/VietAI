@@ -1,48 +1,88 @@
 package com.example.ui
 
-import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import android.Manifest
+import android.content.ComponentName
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import com.example.AppState
-import com.example.service.MusicServerClient
-import com.example.util.LogRepository
+import androidx.media3.common.C
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.example.R
+import com.example.data.LocalAudioTrack
+import com.example.data.LocalMusicRepository
+import com.example.service.LocalMusicService
+import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.absoluteValue
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,381 +93,318 @@ fun VideoScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val TAG = "VideoScreen"
+    val haptics = LocalHapticFeedback.current
+    var library by remember { mutableStateOf<List<LocalAudioTrack>>(emptyList()) }
+    var playlist by remember { mutableStateOf<List<LocalAudioTrack>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+    var showingPlaylist by remember { mutableStateOf(false) }
+    var showPlayerSheet by remember { mutableStateOf(false) }
+    var controller by remember { mutableStateOf<MediaController?>(null) }
+    var trackTitle by remember { mutableStateOf("") }
+    var trackArtist by remember { mutableStateOf("") }
+    var isPlaying by remember { mutableStateOf(false) }
+    var position by remember { mutableStateOf(0f) }
+    var duration by remember { mutableStateOf(0f) }
+    var artworkUri by remember { mutableStateOf<String?>(null) }
 
-    var query by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<MusicServerClient.MusicResult>>(emptyList()) }
-    var isSearching by remember { mutableStateOf(false) }
-    var isFeedLoading by remember { mutableStateOf(false) }
-    var currentFeedTitle by remember { mutableStateOf("Video đề xuất") }
-    var selectedCategory by remember { mutableStateOf("Tất cả") }
-    var isSearchVisible by remember { mutableStateOf(false) }
-
-    // ==== Video đang phát (cố định trên cùng) ====
-    var playingItem by remember { mutableStateOf<MusicServerClient.MusicResult?>(null) }
-    var playingUrl by remember { mutableStateOf<String?>(null) }
-    var isPlayLoading by remember { mutableStateOf(false) }
-    var isFullscreen by remember { mutableStateOf(false) }
-
-    // Cập nhật state cho MainActivity biết để auto-PiP khi nhấn Home
-    LaunchedEffect(isFullscreen, playingUrl) {
-        AppState.isVideoFullscreen = isFullscreen
-        AppState.hasActiveVideo = playingUrl != null
+    LaunchedEffect(context) {
+        playlist = LocalMusicRepository.loadPlaylist(context)
     }
 
-    val categories = listOf(
-        "Tất cả", "Âm nhạc", "Trò chơi", "Tin tức", "Hài kịch",
-        "Thể thao", "Phim", "Học tập", "Lofi", "Vlog", "Nấu ăn", "Du lịch"
-    )
-
-    fun categoryToQuery(cat: String): String = when (cat) {
-        "Tất cả" -> "nhạc việt hot"
-        "Âm nhạc" -> "nhạc việt mới nhất"
-        "Trò chơi" -> "game mobile hay"
-        "Tin tức" -> "tin tức việt nam"
-        "Hài kịch" -> "hài kịch việt"
-        "Thể thao" -> "bóng đá highlight"
-        "Phim" -> "phim hay review"
-        "Học tập" -> "học tiếng anh"
-        "Lofi" -> "lofi chill"
-        "Vlog" -> "vlog việt nam"
-        "Nấu ăn" -> "nấu ăn ngon"
-        "Du lịch" -> "du lịch việt nam"
-        else -> cat
+    val controllerFuture: ListenableFuture<MediaController> = remember(context) {
+        MediaController.Builder(
+            context,
+            SessionToken(context, ComponentName(context, LocalMusicService::class.java))
+        ).buildAsync()
     }
-
-    fun doSearchInternal(q: String, title: String) {
-        val serverUrl = viewModel.settings.musicServerUrl
-        if (serverUrl.isBlank()) {
-            Toast.makeText(context, "Chưa cấu hình Music Server URL", Toast.LENGTH_SHORT).show()
-            return
+    DisposableEffect(controllerFuture) {
+        val listener = Runnable {
+            runCatching { controllerFuture.get() }.getOrNull()?.let { controller = it }
         }
-        isSearching = true
-        currentFeedTitle = title
+        controllerFuture.addListener(listener, ContextCompat.getMainExecutor(context))
+        onDispose {
+            controller?.release()
+            controller = null
+        }
+    }
+
+    LaunchedEffect(controller) {
+        while (controller != null) {
+            val active = controller
+            val metadata = active?.mediaMetadata
+            trackTitle = metadata?.title?.toString().orEmpty()
+            trackArtist = metadata?.artist?.toString().orEmpty()
+            artworkUri = metadata?.artworkUri?.toString()
+            isPlaying = active?.isPlaying == true
+            duration = active?.duration?.takeIf { it > 0 }?.toFloat() ?: 0f
+            position = active?.currentPosition?.coerceAtLeast(0)?.toFloat() ?: 0f
+            delay(500)
+        }
+    }
+
+    val permission = if (Build.VERSION.SDK_INT >= 33) {
+        Manifest.permission.READ_MEDIA_AUDIO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+    val scanLibrary: () -> Unit = {
+        loading = true
         scope.launch {
-            val res = MusicServerClient.searchVideos(serverUrl, q, limit = 20)
-            results = res
-            isSearching = false
-            LogRepository.log(TAG, "[OK] Tìm thấy ${res.size} video")
+            library = withContext(Dispatchers.IO) { LocalMusicRepository.scanDevice(context) }
+            loading = false
         }
     }
-
-    fun loadTrending() {
-        val serverUrl = viewModel.settings.musicServerUrl
-        if (serverUrl.isBlank()) return
-        isFeedLoading = true
-        currentFeedTitle = "Video đề xuất"
-        selectedCategory = "Tất cả"
-        scope.launch {
-            val res = MusicServerClient.getTrendingVideos(serverUrl)
-            results = res
-            isFeedLoading = false
-        }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) scanLibrary()
     }
-
-    fun selectCategory(cat: String) {
-        selectedCategory = cat
-        query = ""
-        if (cat == "Tất cả") loadTrending()
-        else doSearchInternal(categoryToQuery(cat), "Chủ đề: $cat")
-    }
-
-    // ==== Phát video: đẩy lên player cố định trên ====
-    fun playVideo(item: MusicServerClient.MusicResult) {
-        // Nếu cùng video đang phát → bỏ qua
-        if (playingItem?.id == item.id && playingUrl != null) return
-
-        // Dừng video cũ, load video mới
-        playingUrl = null
-        playingItem = item
-        isFullscreen = false
-
-        val serverUrl = viewModel.settings.musicServerUrl
-        if (serverUrl.isBlank()) {
-            Toast.makeText(context, "Chưa cấu hình Music Server URL", Toast.LENGTH_SHORT).show()
-            return
-        }
-        isPlayLoading = true
-        scope.launch {
-            val stream = MusicServerClient.getVideoStreamUrl(serverUrl, item.webpageUrl)
-            val url: String? = stream?.url
-            isPlayLoading = false
-            if (url.isNullOrBlank()) {
-                Toast.makeText(context, "Không phát được video này", Toast.LENGTH_SHORT).show()
-                playingItem = null
-            } else {
-                playingUrl = url
+    val pickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        val selected = uris.mapNotNull { uri ->
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
             }
+            runCatching { LocalMusicRepository.trackForUri(context, uri) }.getOrNull()
+        }
+        if (selected.isNotEmpty()) {
+            playlist = (playlist + selected).distinctBy { it.uri.toString() }
+            scope.launch { LocalMusicRepository.savePlaylist(context, playlist) }
         }
     }
 
-    fun closePlayer() {
-        playingItem = null
-        playingUrl = null
-        isFullscreen = false
-    }
-
-    LaunchedEffect(Unit) {
-        val serverUrl = viewModel.settings.musicServerUrl
-        if (serverUrl.isBlank()) return@LaunchedEffect
-        isFeedLoading = true
-        val res = MusicServerClient.getTrendingVideos(serverUrl)
-        results = res
-        isFeedLoading = false
-    }
-
-    // ==== FULLSCREEN ====
-    if (isFullscreen && playingUrl != null && playingItem != null) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-            VideoPlayerView(
-                streamUrl = playingUrl!!,
-                videoTitle = playingItem?.title,
-                isFullscreen = true,
-                onToggleFullscreen = { isFullscreen = false },
-                onClose = { closePlayer() },
-                onRetry = {
-                    val it = playingItem
-                    if (it != null) playVideo(it)
-                }
-            )
+    fun scanOrRequestPermission() {
+        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
+            scanLibrary()
+        } else {
+            permissionLauncher.launch(permission)
         }
-        return
     }
+
+    fun playFrom(tracks: List<LocalAudioTrack>, selected: LocalAudioTrack) {
+        val player = controller ?: return
+        if (tracks.isEmpty()) return
+        val startIndex = tracks.indexOfFirst { it.uri == selected.uri }.coerceAtLeast(0)
+        player.setMediaItems(tracks.map(LocalMusicRepository::toMediaItem), startIndex, C.TIME_UNSET)
+        player.prepare()
+        player.play()
+        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    val visibleTracks = if (showingPlaylist) playlist else library
 
     Scaffold(
         topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            stringResource(R.string.local_music_title),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            stringResource(R.string.local_music_subtitle),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = ::scanOrRequestPermission) {
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.scan_music))
+                    }
+                    IconButton(onClick = { pickerLauncher.launch(arrayOf("audio/*")) }) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = stringResource(R.string.choose_audio))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        },
+        bottomBar = {
+            if (trackTitle.isNotBlank()) {
+                MiniPlayer(
+                    title = trackTitle,
+                    artist = trackArtist,
+                    playing = isPlaying,
+                    onOpen = { showPlayerSheet = true },
+                    onToggle = { if (isPlaying) controller?.pause() else controller?.play() },
+                    onPrevious = { controller?.seekToPreviousMediaItem() },
+                    onNext = { controller?.seekToNextMediaItem() }
+                )
+            }
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 20.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilterChip(
+                    selected = !showingPlaylist,
+                    onClick = { showingPlaylist = false },
+                    label = { Text(stringResource(R.string.device_library, library.size)) },
+                    leadingIcon = { Icon(Icons.Default.AudioFile, contentDescription = null) }
+                )
+                FilterChip(
+                    selected = showingPlaylist,
+                    onClick = { showingPlaylist = true },
+                    label = { Text(stringResource(R.string.saved_playlist, playlist.size)) },
+                    leadingIcon = { Icon(Icons.Default.QueueMusic, contentDescription = null) }
+                )
+            }
+
+            if (loading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (visibleTracks.isEmpty()) {
+                EmptyMusicLibrary(
+                    playlistView = showingPlaylist,
+                    onScan = ::scanOrRequestPermission,
+                    onChoose = { pickerLauncher.launch(arrayOf("audio/*")) }
+                )
+            } else {
+                Text(
+                    stringResource(R.string.track_count, visibleTracks.size),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 10.dp)
+                )
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    items(visibleTracks, key = { it.uri.toString() }) { track ->
+                        TrackRow(
+                            track = track,
+                            onPlay = {
+                                val queue = if (showingPlaylist) playlist else library
+                                playFrom(queue, track)
+                            },
+                            onAdd = {
+                                playlist = (playlist + track).distinctBy { it.uri.toString() }
+                                scope.launch {
+                                    LocalMusicRepository.savePlaylist(context, playlist)
+                                }
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showPlayerSheet) {
+        ModalBottomSheet(onDismissRequest = { showPlayerSheet = false }) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 28.dp)
+                    .padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                TopAppBar(
-                    title = {
-                        if (isSearchVisible) {
-                            OutlinedTextField(
-                                value = query,
-                                onValueChange = { query = it },
-                                modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
-                                placeholder = { Text("Tìm video...") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Search, null,
-                                        tint = MaterialTheme.colorScheme.primary)
-                                },
-                                trailingIcon = {
-                                    if (query.isNotBlank()) {
-                                        IconButton(onClick = { query = "" }) {
-                                            Icon(Icons.Default.Clear, "Xoá")
-                                        }
-                                    }
-                                },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(onSearch = {
-                                    if (query.isNotBlank()) {
-                                        doSearchInternal(query, "Kết quả: $query")
-                                    }
-                                    isSearchVisible = false
-                                }),
-                                shape = RoundedCornerShape(24.dp)
+                Surface(
+                    modifier = Modifier.size(220.dp),
+                    shape = RoundedCornerShape(36.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    if (artworkUri != null) {
+                        coil.compose.AsyncImage(
+                            model = artworkUri,
+                            contentDescription = stringResource(R.string.now_playing_artwork),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.AudioFile,
+                                contentDescription = null,
+                                modifier = Modifier.size(96.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
                             )
-                        } else {
-                            AppHeaderLogo(subtitle = "Video")
-                        }
-                    },
-                    navigationIcon = {
-                        if (isSearchVisible) {
-                            IconButton(onClick = {
-                                isSearchVisible = false
-                                query = ""
-                            }) {
-                                Icon(Icons.Default.Clear, "Đóng")
-                            }
-                        }
-                    },
-                    actions = {
-                        if (!isSearchVisible) {
-                            IconButton(onClick = { isSearchVisible = true }) {
-                                Icon(Icons.Default.Search, "Tìm kiếm",
-                                    tint = MaterialTheme.colorScheme.primary)
-                            }
                         }
                     }
+                }
+                Spacer(Modifier.height(26.dp))
+                Text(trackTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(trackArtist, style = MaterialTheme.typography.bodyLarge)
+                Slider(
+                    value = if (duration > 0) (position / duration).coerceIn(0f, 1f) else 0f,
+                    onValueChange = { fraction -> position = fraction * duration },
+                    onValueChangeFinished = {
+                        controller?.seekTo((position.toLong()).coerceAtLeast(0L))
+                    },
+                    modifier = Modifier.padding(top = 14.dp)
                 )
-
-                AnimatedVisibility(
-                    visible = !isSearchVisible,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(categories) { cat ->
-                            CategoryChip(
-                                label = cat,
-                                selected = selectedCategory == cat,
-                                onClick = { selectCategory(cat) }
-                            )
-                        }
-                    }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(formatTime(position.toLong()))
+                    Text(formatTime(duration.toLong()))
                 }
-
-                Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
-            }
-        },
-        bottomBar = {
-            AppBottomNav(currentRoute = currentRoute, onNavigate = onNavigate)
-        }
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-
-            // ============ PLAYER CỐ ĐỊNH TRÊN CÙNG ============
-            if (playingItem != null) {
-                val item = playingItem!!
-                // Player hoặc loading
-                if (playingUrl != null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
-                            .background(Color.Black)
-                    ) {
-                        VideoPlayerView(
-                            streamUrl = playingUrl!!,
-                            videoTitle = item.title,
-                            isFullscreen = false,
-                            onToggleFullscreen = { isFullscreen = true },
-                            onClose = { closePlayer() },
-                            onRetry = { playVideo(item) }
-                        )
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
-                            .background(Color.Black),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = Color.White)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Đang tải video...", color = Color.White, fontSize = 13.sp)
-                        }
-                    }
-                }
-
-                // Thông tin video đang phát (kiểu YouTube)
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(
-                                listOf(Color(0xFF006A60), Color(0xFF22C55E))
-                            )),
-                        contentAlignment = Alignment.Center
+                    IconButton(onClick = {
+                        controller?.shuffleModeEnabled = !(controller?.shuffleModeEnabled ?: false)
+                    }) {
+                        Icon(
+                            Icons.Default.Shuffle,
+                            contentDescription = stringResource(R.string.shuffle),
+                            tint = if (controller?.shuffleModeEnabled == true) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                    IconButton(onClick = { controller?.seekToPreviousMediaItem() }) {
+                        Icon(Icons.Default.SkipPrevious, contentDescription = stringResource(R.string.previous_track))
+                    }
+                    IconButton(
+                        onClick = { if (isPlaying) controller?.pause() else controller?.play() },
+                        modifier = Modifier.size(68.dp)
                     ) {
-                        Text(
-                            text = (item.uploader?.firstOrNull() ?: 'V').uppercase(),
-                            color = Color.White, fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(item.title,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "${item.uploader ?: "Không rõ kênh"} • ${fakeViews(item.id)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
-            }
-
-            // ============ DANH SÁCH VIDEO (luôn hiển thị bên dưới) ============
-            if (isSearching || isFeedLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            if (isSearching) "Đang tìm kiếm..." else "Đang tải đề xuất...",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            } else if (results.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize().padding(32.dp),
-                    contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Movie, null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("Chưa có video nào",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Bấm kính lúp để tìm kiếm video",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            } else {
-                val listState = rememberLazyListState()
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 16.dp)
-                ) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(4.dp).height(20.dp)
-                                    .background(MaterialTheme.colorScheme.primary,
-                                        RoundedCornerShape(2.dp))
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+                            Icon(
+                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = stringResource(
+                                    if (isPlaying) R.string.pause else R.string.play
+                                ),
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.padding(16.dp).size(36.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(currentFeedTitle,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text("${results.size}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-
-                    items(results, key = { it.id }) { item ->
-                        val isCurrent = item.id == playingItem?.id
-                        YtVideoCard(
-                            item = item,
-                            isPlaying = isCurrent,
-                            onClick = { playVideo(item) }
+                    IconButton(onClick = { controller?.seekToNextMediaItem() }) {
+                        Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.next_track))
+                    }
+                    IconButton(onClick = {
+                        controller?.repeatMode = when (controller?.repeatMode) {
+                            androidx.media3.common.Player.REPEAT_MODE_OFF ->
+                                androidx.media3.common.Player.REPEAT_MODE_ALL
+                            androidx.media3.common.Player.REPEAT_MODE_ALL ->
+                                androidx.media3.common.Player.REPEAT_MODE_ONE
+                            else -> androidx.media3.common.Player.REPEAT_MODE_OFF
+                        }
+                    }) {
+                        Icon(
+                            Icons.Default.Repeat,
+                            contentDescription = stringResource(R.string.repeat_mode),
+                            tint = if ((controller?.repeatMode
+                                    ?: androidx.media3.common.Player.REPEAT_MODE_OFF) !=
+                                androidx.media3.common.Player.REPEAT_MODE_OFF
+                            ) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -437,165 +414,152 @@ fun VideoScreen(
 }
 
 @Composable
-private fun CategoryChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary
-             else MaterialTheme.colorScheme.surfaceVariant
-    val fg = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+private fun TrackRow(
+    track: LocalAudioTrack,
+    onPlay: () -> Unit,
+    onAdd: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onPlay),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Text(label, color = fg, fontSize = 14.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (track.artworkUri != null) {
+                        coil.compose.AsyncImage(
+                            model = track.artworkUri,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(Icons.Default.AudioFile, contentDescription = null)
+                    }
+                }
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(
+                    track.title.ifBlank { stringResource(R.string.unknown_track) },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    track.artist.ifBlank { stringResource(R.string.local_audio_file) },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onAdd) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_to_playlist))
+            }
+            IconButton(onClick = onPlay) {
+                Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.play))
+            }
+        }
     }
 }
 
 @Composable
-private fun YtVideoCard(
-    item: MusicServerClient.MusicResult,
-    isPlaying: Boolean = false,
-    onClick: () -> Unit
+private fun MiniPlayer(
+    title: String,
+    artist: String,
+    playing: Boolean,
+    onOpen: () -> Unit,
+    onToggle: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        tonalElevation = 5.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                Text(artist, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = onPrevious) {
+                Icon(Icons.Default.SkipPrevious, contentDescription = stringResource(R.string.previous_track))
+            }
+            IconButton(onClick = onToggle) {
+                Icon(
+                    if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = stringResource(if (playing) R.string.pause else R.string.play)
+                )
+            }
+            IconButton(onClick = onNext) {
+                Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.next_track))
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyMusicLibrary(
+    playlistView: Boolean,
+    onScan: () -> Unit,
+    onChoose: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .background(
-                if (isPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                else Color.Transparent
-            )
-            .padding(bottom = 16.dp)
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .background(Color(0xFF1A1A1A))
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.size(88.dp)
         ) {
-            if (!item.thumbnail.isNullOrBlank()) {
-                AsyncImage(
-                    model = item.thumbnail,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Movie, null,
-                        tint = Color.White.copy(alpha = 0.5f),
-                        modifier = Modifier.size(48.dp))
-                }
-            }
-
-            if (!item.durationStr.isNullOrBlank() && item.durationStr != "00:00") {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp)
-                        .background(Color.Black.copy(alpha = 0.8f),
-                            RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(item.durationStr, color = Color.White,
-                        fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .background(Brush.linearGradient(
-                        listOf(Color(0xFF006A60), Color(0xFF22C55E))
-                    ), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text("VA", color = Color.White, fontSize = 10.sp,
-                    fontWeight = FontWeight.Black)
-            }
-
-            // Badge "Đang phát" nếu là video hiện tại
-            if (isPlaying) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(8.dp)
-                        .background(MaterialTheme.colorScheme.primary,
-                            RoundedCornerShape(4.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text("▶ ĐANG PHÁT", color = Color.White,
-                        fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(42.dp))
             }
         }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Brush.linearGradient(
-                        listOf(Color(0xFF006A60), Color(0xFF22C55E))
-                    )),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = (item.uploader?.firstOrNull() ?: 'V').uppercase(),
-                    color = Color.White, fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
+        Spacer(Modifier.height(18.dp))
+        Text(
+            stringResource(if (playlistView) R.string.empty_playlist else R.string.empty_library),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            stringResource(if (playlistView) R.string.add_audio_hint else R.string.scan_audio_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(18.dp))
+        if (!playlistView) {
+            Button(onClick = onScan) {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Text(stringResource(R.string.scan_music), modifier = Modifier.padding(start = 8.dp))
             }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(item.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = buildString {
-                        append(item.uploader ?: "Không rõ kênh")
-                        append(" • "); append(fakeViews(item.id))
-                        append(" • "); append(fakeTimeAgo(item.id))
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-            }
-            Icon(Icons.Default.MoreVert, null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp))
+        }
+        Button(onClick = onChoose, modifier = Modifier.padding(top = 8.dp)) {
+            Icon(Icons.Default.FolderOpen, contentDescription = null)
+            Text(stringResource(R.string.choose_audio), modifier = Modifier.padding(start = 8.dp))
         }
     }
 }
 
-private fun fakeViews(id: String): String {
-    if (id.isEmpty()) return "1 N lượt xem"
-    val views = (id.hashCode().toLong().absoluteValue % 9_000_000L) + 1_000L
-    return when {
-        views >= 1_000_000 -> "${views / 1_000_000} Tr lượt xem"
-        views >= 1_000 -> "${views / 1_000} N lượt xem"
-        else -> "$views lượt xem"
-    }
-}
-
-private fun fakeTimeAgo(id: String): String {
-    if (id.isEmpty()) return "1 tháng trước"
-    val days = (id.hashCode().toLong().absoluteValue % 365L) + 1
-    return when {
-        days < 7 -> "$days ngày trước"
-        days < 30 -> "${days / 7} tuần trước"
-        days < 365 -> "${days / 30} tháng trước"
-        else -> "${days / 365} năm trước"
-    }
+private fun formatTime(milliseconds: Long): String {
+    val totalSeconds = milliseconds / 1000
+    return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
 }

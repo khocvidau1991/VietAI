@@ -1,0 +1,34 @@
+name: Báo lỗi
+description: Báo cáo lỗi để giúp chúng tôi cải thiện Việt AI.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Mô tả lỗi
+      description: Nêu ngắn gọn điều đã xảy ra.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Các bước tái hiện
+      placeholder: "1. ...\n2. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Kết quả mong đợi
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Thiết bị và phiên bản Android
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log liên quan (đã xóa secret)
+      render: text

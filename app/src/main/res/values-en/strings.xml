@@ -1,0 +1,23 @@
+<resources>
+    <string name="local_music_title">My music</string>
+    <string name="local_music_subtitle">Play audio stored on this device</string>
+    <string name="scan_music">Scan music</string>
+    <string name="choose_audio">Choose files</string>
+    <string name="device_library">Library (%1$d)</string>
+    <string name="saved_playlist">Playlist (%1$d)</string>
+    <string name="track_count">%1$d tracks</string>
+    <string name="unknown_track">Unknown track</string>
+    <string name="local_audio_file">Local audio file</string>
+    <string name="add_to_playlist">Add to playlist</string>
+    <string name="previous_track">Previous track</string>
+    <string name="next_track">Next track</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="repeat_mode">Repeat mode</string>
+    <string name="empty_playlist">Your playlist is empty</string>
+    <string name="empty_library">No music found</string>
+    <string name="add_audio_hint">Choose audio files to add to your playlist.</string>
+    <string name="scan_audio_hint">Scan your device library or choose audio files.</string>
+    <string name="now_playing_artwork">Now playing artwork</string>
+</resources>

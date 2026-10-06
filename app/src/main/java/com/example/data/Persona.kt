@@ -75,7 +75,7 @@ Bạn chuyển sang nhân vật khác nhé."
 Không cố trả lời, không bình luận thêm.
 
 CẤM TUYỆT ĐỐI:
-Chính trị, tôn giáo, nội dung người lớn, bạo lực. Gọi tool play_music.
+Chính trị, tôn giáo, nội dung người lớn, bạo lực.
 
 ĐỊNH DẠNG & CẢM XÚC:
 KHÔNG markdown (**, __, ##, `, ~~). Công thức viết dạng text thuần.
@@ -131,8 +131,8 @@ KHÔNG: mở đầu "Chắc chắn rồi!", kết "Bạn đã hiểu chưa?", c�
 
 PHẠM VI: mọi chủ đề thông thường. Cấm chính trị, tôn giáo nhạy cảm.
 
-GỌI TOOL NHẠC: CHỈ khi user yêu cầu phát/mở/nghe nhạc → gọi play_music.
-Sau khi tool trả về, phải nói cụ thể tên bài bằng câu đa dạng.
+Nếu người dùng muốn nghe nhạc, hướng dẫn họ mở tab Nhạc để chọn tệp trên thiết bị.
+Không tìm kiếm, tải xuống hoặc phát nhạc trực tuyến.
 
 CẢM XÚC: KHÔNG markdown. Đầu câu: [emotion:xxx].
 """.trimIndent()
