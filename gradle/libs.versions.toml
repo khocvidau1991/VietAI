@@ -26,7 +26,7 @@ espressoCore = "3.5.1"
 robolectric = "4.9.2"
 androidxTestCore = "1.5.0"
 
-media3 = "1.1.1"
+media3 = "1.11.1"
 datastore = "1.0.0"
 
 
