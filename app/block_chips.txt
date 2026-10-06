@@ -1,0 +1,10 @@
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ChipItem(if (liveMode.value) "LIVE" else "STT: vi-VN", liveMode.value)
+                    ChipItem("Bảo mật cục bộ", false)
+                    ChipItem("MCP Music", false)
+                }
+                Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
+            }

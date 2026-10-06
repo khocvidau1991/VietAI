@@ -1,0 +1,54 @@
+# ===== Gradle =====
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/**/build/
+
+# ===== Android =====
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+app/release/
+*.jks
+*.keystore
+!debug.keystore
+
+# ===== Android Studio / IntelliJ =====
+.idea/
+*.iml
+*.iws
+*.ipr
+.cxx/
+
+# ===== Log / OS =====
+*.log
+local.properties
+build.log
+.DS_Store
+Thumbs.db
+
+# ===== Kotlin =====
+.kotlin/
+
+# ===== NDK =====
+obj/
+.externalNativeBuild/
+
+# ===== Cache =====
+.cache/
+*.hprof
+
+# ===== Keystore nhạy cảm =====
+keystore.properties
+signing.properties
+
+# ===== Files tạm =====
+*.tmp
+*.bak
+*.swp

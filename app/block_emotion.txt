@@ -1,0 +1,15 @@
+                // ===== Hiển thị: RotatingDisc khi phát nhạc, EmotionView khi chat =====
+                if (currentTrack != null) {
+                    Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                        RotatingDisc(
+                            trackTitle = currentTrack,
+                            thumbnailUrl = currentThumbnail,
+                            isPlaying = isPlayingMusic,
+                            isBuffering = isBufferingMusic,
+                            onStop = { viewModel.stopMusic() }
+                        )
+                    }
+                } else {
+                    EmotionView(emotion = currentEmotion, size = 96.dp)
+                }
+

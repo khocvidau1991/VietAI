@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Cache dir — nơi camera ghi ảnh tạm -->
+    <cache-path name="cache_images" path="images/" />
+    <cache-path name="cache_root" path="." />
+
+    <!-- Files dir — fallback -->
+    <files-path name="files_images" path="images/" />
+
+    <!-- External cache — fallback -->
+    <external-cache-path name="ext_cache_images" path="images/" />
+</paths>

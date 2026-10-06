@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Nền gradient bo góc -->
+    <path
+        android:pathData="M20,0 L88,0 A20,20 0 0,1 108,20 L108,88 A20,20 0 0,1 88,108 L20,108 A20,20 0 0,1 0,88 L0,20 A20,20 0 0,1 20,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0" android:startY="0"
+                android:endX="108" android:endY="108"
+                android:type="linear">
+                <item android:offset="0" android:color="#FF006A60" />
+                <item android:offset="1" android:color="#FF22C55E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Chữ V trắng -->
+    <path
+        android:pathData="M30,37 L41,71 L52,37"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="7.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- Chữ A trắng -->
+    <path
+        android:pathData="M56,71 L68,37 L80,71"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="7.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- Thanh ngang A -->
+    <path
+        android:pathData="M61,58 L75,58"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="7.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>
